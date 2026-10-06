@@ -1,167 +1,29 @@
-// API base: set <meta name="api-base" content="https://backend.example.com"> only if the API is on another origin.
-const BASE = ((document.querySelector('meta[name=api-base]') || {}).content || '').replace(/\/$/, '') + '/api';
-const $ = id => document.getElementById(id);
-const LABEL = { normal: 'Normal', attack: 'Known attack', possible_zero_day: 'Possible Zero-Day / Unknown Anomaly', no_data: 'No data yet' };
+// Stateless auth (HMAC-signed token) so it works across serverless invocations.
+const crypto = require('crypto');
+const db = require('./db');
+const SECRET = process.env.JWT_SECRET || 'dev-only-secret';
+const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
+const sign = p => crypto.createHmac('sha256', SECRET).update(p).digest('base64url');
+const hash = (pw, salt = crypto.randomBytes(16).toString('hex')) => salt + ':' + crypto.scryptSync(pw, salt, 32).toString('hex');
+const verify = (pw, stored) => { const [s] = stored.split(':'); const a = Buffer.from(hash(pw, s)), b = Buffer.from(stored); return a.length === b.length && crypto.timingSafeEqual(a, b); };
 
-async function api(path, opt = {}) {
-  const t = sessionStorage.getItem('token');
+async function seedAdmin() {
+  const u = process.env.ADMIN_USERNAME || 'admin';
+  if (!(await db.getUserByUsername(u))) await db.createUser(crypto.randomUUID(), u, hash(process.env.ADMIN_PASSWORD || 'admin123'));
+}
+async function login(username, password) {
+  const u = username && password ? await db.getUserByUsername(String(username)) : null;
+  if (!u || !verify(String(password), u.password_hash)) return null;
+  const p = b64({ id: u.id, username: u.username, exp: Date.now() + 8 * 3600e3 });
+  return { user: { id: u.id, username: u.username }, token: p + '.' + sign(p) };
+}
+function requireAuth(req, res, next) {
+  const [p, s] = (req.headers.authorization || '').replace('Bearer ', '').split('.');
   try {
-    const response = await fetch(BASE + path, {
-      ...opt,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(t && { Authorization: 'Bearer ' + t })
-      }
-    });
-
-    const data = await response.json();
-    if (response.status === 401 && path !== '/login') {
-      sessionStorage.clear();
-      location.href = 'login.html';
-    }
-    return data;
-  } catch {
-    return { success: false, error: { message: 'Cannot reach the server' } };
-  }
+    if (!p || s !== sign(p)) throw 0;
+    const d = JSON.parse(Buffer.from(p, 'base64url'));
+    if (d.exp < Date.now()) throw 0;
+    req.user = { id: d.id, username: d.username }; next();
+  } catch { res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Missing or invalid token' } }); }
 }
-
-const msg = d => (d.error && d.error.message) || d.message || 'Request failed';
-const cell = (tr, v, cls) => {
-  const td = tr.insertCell();
-  td.textContent = v ?? '-';
-  if (cls) td.className = cls;
-};
-
-function setError(text) {
-  const el = $('err');
-  if (!el) return;
-  el.textContent = text || '';
-}
-
-if (document.body.dataset.page === 'login') {
-  const loginForm = $('loginForm');
-  const passwordField = $('p');
-  const togglePassword = document.querySelector('[data-toggle-password]');
-
-  const go = async () => {
-    const username = $('u').value.trim();
-    const password = $('p').value;
-    setError('');
-
-    if (!username || !password) {
-      setError('Please enter both username and password.');
-      return;
-    }
-
-    const d = await api('/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password })
-    });
-
-    if (d.success) {
-      sessionStorage.setItem('token', d.token);
-      sessionStorage.setItem('user', d.user.username);
-      location.href = 'dashboard.html';
-      return;
-    }
-
-    setError(msg(d));
-  };
-
-  if (loginForm) {
-    loginForm.addEventListener('submit', event => {
-      event.preventDefault();
-      go();
-    });
-  }
-
-  if (passwordField) {
-    passwordField.addEventListener('keydown', event => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        go();
-      }
-    });
-  }
-
-  if (togglePassword) {
-    togglePassword.addEventListener('click', () => {
-      const shouldShow = passwordField.type === 'password';
-      passwordField.type = shouldShow ? 'text' : 'password';
-      togglePassword.textContent = shouldShow ? 'Hide' : 'Show';
-      togglePassword.setAttribute('aria-label', shouldShow ? 'Hide password' : 'Show password');
-      passwordField.focus();
-    });
-  }
-}
-
-if (document.body.dataset.page === 'dashboard') {
-  if (!sessionStorage.getItem('token')) location.href = 'login.html';
-  $('out').onclick = () => {
-    sessionStorage.clear();
-    location.href = 'login.html';
-  };
-
-  async function refresh() {
-    const [d, a] = await Promise.all([api('/dashboard'), api('/activity')]);
-    if (!d.success || !a.success) {
-      $('err').textContent = msg(d.success ? a : d);
-      return;
-    }
-
-    $('err').textContent = '';
-    const s = d.stats, c = d.currentStatus;
-    $('total').textContent = s.totalEvents;
-    $('normal').textContent = s.normalTraffic;
-    $('attacks').textContent = s.attacks;
-    $('anoms').textContent = s.anomalies;
-    $('st').textContent = LABEL[c.status] || c.status;
-    $('sev').textContent = c.severity;
-    $('banner').className = 'panel s-' + c.status;
-
-    const body = $('rows');
-    body.textContent = '';
-
-    for (const e of a.events) {
-      const tr = body.insertRow();
-      cell(tr, new Date(e.timestamp).toLocaleString());
-      cell(tr, e.sourceIp);
-      cell(tr, e.destinationIp);
-      cell(tr, LABEL[e.status] || e.status, 'pill s-' + e.status);
-      cell(tr, e.attackType);
-      cell(tr, e.severity);
-      cell(tr, e.confidence == null ? '-' : Math.round(e.confidence * 100) + '%');
-    }
-
-    $('empty').hidden = a.events.length > 0;
-  }
-
-  $('an').onclick = async () => {
-    let features;
-    try {
-      features = JSON.parse($('feat').value);
-    } catch {
-      $('res').textContent = 'Features must be valid JSON';
-      return;
-    }
-
-    const d = await api('/analyze', {
-      method: 'POST',
-      body: JSON.stringify({
-        features,
-        sourceIp: $('sip').value,
-        destinationIp: $('dip').value,
-        mockScenario: $('mock').value
-      })
-    });
-
-    $('res').textContent = d.success
-      ? `${LABEL[d.detection.status]} (${d.detection.severity}): ${d.detection.reason}`
-      : msg(d);
-
-    refresh();
-  };
-
-  refresh();
-  setInterval(refresh, 5000);
-}
+module.exports = { seedAdmin, login, requireAuth };
