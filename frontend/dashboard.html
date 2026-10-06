@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="api-base" content=""><title>Dashboard - Cyber Threat Detection</title><link rel="stylesheet" href="style.css"></head>
+<body data-page="dashboard"><main class="wrap">
+<header class="bar"><h2>Security dashboard</h2><button class="btn ghost" id="out">Log out</button></header>
+<section id="banner" class="panel"><div><span>Current status</span><br><b id="st">Loading...</b></div><div><span>Severity</span><br><b id="sev">-</b></div></section>
+<section class="stats">
+<div class="panel"><b id="total">0</b><span>Total events</span></div><div class="panel"><b id="normal">0</b><span>Normal traffic</span></div>
+<div class="panel"><b id="attacks">0</b><span>Known attacks</span></div><div class="panel"><b id="anoms">0</b><span>Anomalies</span></div></section>
+<section class="panel"><h3>Recent events</h3><p class="err" id="err" role="alert"></p><div class="scroll"><table><thead><tr>
+<th>Timestamp</th><th>Source IP</th><th>Destination IP</th><th>Result</th><th>Attack type</th><th>Severity</th><th>Confidence</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p id="empty" style="color:var(--mute)">No events yet. Send a flow with POST /api/analyze or use the form below.</p></section>
+<details><summary>Analyze a network flow</summary><div class="panel">
+<label>Features (JSON object, feature name to number)<textarea id="feat">{"Destination Port": 80, "Flow Duration": 1200}</textarea></label>
+<label>Source IP<input id="sip"></label><label>Destination IP<input id="dip"></label>
+<label>Mock scenario (only used when backend MODEL_MODE=mock)<select id="mock"><option>normal</option><option>attack</option><option>anomaly</option></select></label>
+<button class="btn" id="an">Analyze flow</button><p id="res" class="err" style="color:var(--text)"></p></div></details>
+</main><script src="script.js"></script></body></html>
