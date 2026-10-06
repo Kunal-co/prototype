@@ -1,38 +1,57 @@
-# Fixes and updates
+// Stateless auth (HMAC-signed token) so it works across serverless invocations.
+const crypto = require('crypto');
+const db = require('./db');
 
-This update fixes the login/password issues, improves the dashboard styling, and adds a temporary detector test helper for manual validation.
+const SECRET = process.env.JWT_SECRET || 'dev-only-secret';
+const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
+const sign = p => crypto.createHmac('sha256', SECRET).update(p).digest('base64url');
+const hash = (pw, salt = crypto.randomBytes(16).toString('hex')) => salt + ':' + crypto.scryptSync(pw, salt, 32).toString('hex');
 
-## Frontend fixes
+const verify = (pw, stored) => {
+  if (!stored || typeof stored !== 'string' || !stored.includes(':')) return false;
+  const [salt] = stored.split(':');
+  if (!salt) return false;
+  const expected = Buffer.from(hash(pw, salt));
+  const actual = Buffer.from(stored);
+  if (expected.length !== actual.length) return false;
+  return crypto.timingSafeEqual(expected, actual);
+};
 
-- Fixed the login form so the password field behaves correctly with a proper submit flow.
-- Added a password visibility toggle so users can confirm what they are typing.
-- Prevented form submission reloads and improved keyboard handling with Enter-to-login.
-- Added clear validation messages instead of silent failures.
-- Updated the login and dashboard styles to a cleaner modern UI with responsive layout.
+async function seedAdmin() {
+  const username = process.env.ADMIN_USERNAME || 'admin';
+  if (!(await db.getUserByUsername(username))) {
+    await db.createUser(crypto.randomUUID(), username, hash(process.env.ADMIN_PASSWORD || 'admin123'));
+  }
+}
 
-## Backend fixes
+async function login(username, password) {
+  const u = username && password ? await db.getUserByUsername(String(username)) : null;
+  if (!u || !verify(String(password), u.password_hash)) return null;
 
-- Hardened the auth token parser to handle standard `Authorization: Bearer <token>` requests reliably.
-- Fixed password verification to safely reject malformed stored hashes.
-- Kept API behavior compatible with the existing Express backend.
+  const payload = b64({ id: u.id, username: u.username, exp: Date.now() + 8 * 3600e3 });
+  return { user: { id: u.id, username: u.username }, token: payload + '.' + sign(payload) };
+}
 
-## Test helper
+function requireAuth(req, res, next) {
+  const authHeader = (req.headers.authorization || '').trim();
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  const rawToken = match ? match[1].trim() : null;
 
-- Added `test_detector.js` at the repo root. It randomly chooses one of the mock detector scenarios (`normal`, `attack`, `anomaly`) and prints the result.
-- This file is intended for quick manual testing before you remove it or revert it later.
+  if (!rawToken) {
+    return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Missing or invalid token' } });
+  }
 
-## Files changed
+  const [payload, signature] = rawToken.split('.');
+  try {
+    if (!payload || !signature || signature !== sign(payload)) throw new Error('invalid signature');
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url'));
+    if (!decoded || decoded.exp < Date.now()) throw new Error('expired');
+    req.user = { id: decoded.id, username: decoded.username };
+    return next();
+  } catch {
+    return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Missing or invalid token' } });
+  }
+}
 
-- `frontend/login.html`
-- `frontend/script.js`
-- `frontend/style.css`
-- `backend/auth.js`
-- `test_detector.js`
+module.exports = { seedAdmin, login, requireAuth };
 
-## How to run the detector helper
-
-```bash
-node test_detector.js
-```
-
-It will randomly simulate traffic detection using the existing mock model and print the detection result.
