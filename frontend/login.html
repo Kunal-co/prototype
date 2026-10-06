@@ -1,7 +1,55 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="api-base" content=""><title>Log in - Cyber Threat Detection</title><link rel="stylesheet" href="style.css"></head>
-<body data-page="login"><main class="panel login"><h2>Log in</h2>
-<label>Username<input id="u" autocomplete="username"></label>
-<label>Password<input id="p" type="password" autocomplete="current-password"></label>
-<p class="err" id="err" role="alert"></p><button class="btn" id="go">Log in</button></main>
-<script src="script.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - NetGuard AI</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="auth-page" data-page="login">
+    <main class="auth-container">
+      <div class="auth-card">
+        <div class="auth-header">
+          <div class="auth-brand">NetGuard AI</div>
+          <h2 class="auth-title">Secure Access</h2>
+        </div>
+
+        <form id="loginForm" class="auth-form">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              autocomplete="username"
+              placeholder="admin"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              autocomplete="current-password"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block">Log in</button>
+        </form>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <div class="auth-footer">
+          <p class="hint">Default: admin / admin123</p>
+        </div>
+      </div>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>

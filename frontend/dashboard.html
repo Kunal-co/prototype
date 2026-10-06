@@ -1,17 +1,139 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="api-base" content=""><title>Dashboard - Cyber Threat Detection</title><link rel="stylesheet" href="style.css"></head>
-<body data-page="dashboard"><main class="wrap">
-<header class="bar"><h2>Security dashboard</h2><button class="btn ghost" id="out">Log out</button></header>
-<section id="banner" class="panel"><div><span>Current status</span><br><b id="st">Loading...</b></div><div><span>Severity</span><br><b id="sev">-</b></div></section>
-<section class="stats">
-<div class="panel"><b id="total">0</b><span>Total events</span></div><div class="panel"><b id="normal">0</b><span>Normal traffic</span></div>
-<div class="panel"><b id="attacks">0</b><span>Known attacks</span></div><div class="panel"><b id="anoms">0</b><span>Anomalies</span></div></section>
-<section class="panel"><h3>Recent events</h3><p class="err" id="err" role="alert"></p><div class="scroll"><table><thead><tr>
-<th>Timestamp</th><th>Source IP</th><th>Destination IP</th><th>Result</th><th>Attack type</th><th>Severity</th><th>Confidence</th></tr></thead><tbody id="rows"></tbody></table></div>
-<p id="empty" style="color:var(--mute)">No events yet. Send a flow with POST /api/analyze or use the form below.</p></section>
-<details><summary>Analyze a network flow</summary><div class="panel">
-<label>Features (JSON object, feature name to number)<textarea id="feat">{"Destination Port": 80, "Flow Duration": 1200}</textarea></label>
-<label>Source IP<input id="sip"></label><label>Destination IP<input id="dip"></label>
-<label>Mock scenario (only used when backend MODEL_MODE=mock)<select id="mock"><option>normal</option><option>attack</option><option>anomaly</option></select></label>
-<button class="btn" id="an">Analyze flow</button><p id="res" class="err" style="color:var(--text)"></p></div></details>
-</main><script src="script.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - NetGuard AI</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="dashboard-page" data-page="dashboard">
+    <div class="dashboard-wrapper">
+      <header class="dashboard-header">
+        <div class="header-left">
+          <h1 class="dashboard-title">Security Dashboard</h1>
+          <p class="dashboard-subtitle" id="welcomeMessage"></p>
+        </div>
+
+        <div class="header-right">
+          <button id="captureToggleBtn" class="btn btn-primary">Start Capture</button>
+          <button id="logoutBtn" class="btn btn-ghost">Log out</button>
+        </div>
+      </header>
+
+      <main class="dashboard-main">
+        <!-- Capture Status -->
+        <section id="captureStatusSection" class="capture-status-section">
+          <div class="status-badge">
+            <span id="captureStatusText">⚫ Capture Stopped</span>
+            <span id="flowCountText" class="flow-count">0 flows</span>
+          </div>
+        </section>
+
+        <!-- Status Banner -->
+        <section id="statusBanner" class="status-banner status-normal">
+          <div class="status-item">
+            <span class="status-label">Current Status</span>
+            <span class="status-value" id="statusText">Loading...</span>
+          </div>
+
+          <div class="status-item">
+            <span class="status-label">Severity</span>
+            <span class="status-severity" id="severityText">—</span>
+          </div>
+
+          <div class="status-item">
+            <span class="status-label">Last Updated</span>
+            <span class="status-value" id="lastUpdate">—</span>
+          </div>
+        </section>
+
+        <!-- Statistics Grid -->
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="totalEvents">0</div>
+            <div class="stat-label">Total Events</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-value" id="normalTraffic">0</div>
+            <div class="stat-label">Normal Traffic</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-value" id="attacks">0</div>
+            <div class="stat-label">Known Attacks</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-value" id="anomalies">0</div>
+            <div class="stat-label">Anomalies</div>
+          </div>
+        </section>
+
+        <!-- Live Network Flows -->
+        <section class="flows-panel">
+          <div class="panel-header">
+            <h3>Live Network Flows</h3>
+            <button id="refreshFlowsBtn" class="btn-icon">↻</button>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="flows-table">
+              <thead>
+                <tr>
+                  <th>Source IP</th>
+                  <th>Source Port</th>
+                  <th>Destination IP</th>
+                  <th>Dest Port</th>
+                  <th>Protocol</th>
+                  <th>Packets</th>
+                  <th>Bytes</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="flowsTable">
+                <tr>
+                  <td colspan="8" style="text-align: center; color: #888;">
+                    Start capture to see live flows
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Recent Events -->
+        <section class="events-panel">
+          <div class="panel-header">
+            <h3>Recent Detection Events</h3>
+            <button id="refreshEventsBtn" class="btn-icon">↻</button>
+          </div>
+
+          <div id="errorMessage" class="error-message"></div>
+
+          <div class="table-wrapper">
+            <table class="events-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Source IP</th>
+                  <th>Destination IP</th>
+                  <th>Status</th>
+                  <th>Type</th>
+                  <th>Confidence</th>
+                </tr>
+              </thead>
+              <tbody id="eventsTable">
+                <tr>
+                  <td colspan="6" style="text-align: center; color: #888;">No events yet</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
