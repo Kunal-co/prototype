@@ -1,7 +1,40 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="api-base" content=""><title>Log in - Cyber Threat Detection</title><link rel="stylesheet" href="style.css"></head>
-<body data-page="login"><main class="panel login"><h2>Log in</h2>
-<label>Username<input id="u" autocomplete="username"></label>
-<label>Password<input id="p" type="password" autocomplete="current-password"></label>
-<p class="err" id="err" role="alert"></p><button class="btn" id="go">Log in</button></main>
-<script src="script.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="api-base" content="">
+    <title>Log in - Cyber Threat Detection</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body data-page="login">
+    <main class="auth-shell">
+      <section class="panel auth-card" aria-labelledby="login-title">
+        <div class="brand-block">
+          <span class="brand-pill">Cyber Threat Detection</span>
+          <h2 id="login-title">Secure access</h2>
+        </div>
+
+        <form id="loginForm" novalidate>
+          <label>
+            <span>Username</span>
+            <input id="u" name="username" type="text" autocomplete="username" spellcheck="false" placeholder="Enter username">
+          </label>
+
+          <label>
+            <span>Password</span>
+            <div class="password-wrap">
+              <input id="p" name="password" type="password" autocomplete="current-password" spellcheck="false" placeholder="Enter password">
+              <button type="button" class="toggle-password" aria-label="Show password" data-toggle-password>Show</button>
+            </div>
+          </label>
+
+          <p class="err" id="err" role="alert" aria-live="polite"></p>
+          <button type="submit" class="btn btn-full" id="go">Log in</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
